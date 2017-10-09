@@ -7,6 +7,7 @@
 #define BUF_SIZE 10
 #define MAX_VALUE 1000
 #define MIN_VALUE 100
+#define GEN_TIME 100 // miliseconds
 
 // the buffer works like a stack for
 // the sake of simplicity, if needed
@@ -44,28 +45,34 @@ void* producer(void *arg) {
         // for new items to consume)
         usleep(100000);
 #endif
-
+        usleep(GEN_TIME * 1000);
+        // in real life it may be some data fetched from
+        // sensors, the web, or just some I/O
+        int t = (rand() % (MAX_VALUE+1-MIN_VALUE)) + MIN_VALUE;
+        printf("Produced: %d\n", t);
+        sleep(rand() % 2);
         pthread_mutex_lock(&buffer->mutex);
 
         if(buffer->len == BUF_SIZE) { // full
             // wait until some elements are consumed
             pthread_cond_wait(&buffer->can_produce, &buffer->mutex);
         }
-
-        // in real life it may be some data fetched from
-        // sensors, the web, or just some I/O
-        int t = (rand() % (MAX_VALUE+1-MIN_VALUE)) + MIN_VALUE;
-        printf("Produced: %d\n", t);
+        
 
         // append data to the buffer
         buffer->buf[buffer->len] = t;
         ++buffer->len;
-
+        int i;
+        for(i = 0; i < buffer->len; ++i){
+            printf("%d ", buffer->buf[i]);
+        }
+        printf("\n");
+        //
         // signal the fact that new items may be consumed
         pthread_cond_signal(&buffer->can_consume);
         pthread_mutex_unlock(&buffer->mutex);
     }
-
+    
     // never reached
     return NULL;
 }
@@ -73,7 +80,7 @@ void* producer(void *arg) {
 // consume random numbers
 void* consumer(void *arg) {
     buffer_t *buffer = (buffer_t*)arg;
-
+    int work;
     while(1) {
 #ifdef OVERFLOW
         // show that the buffer won't overflow if the consumer
@@ -89,17 +96,18 @@ void* consumer(void *arg) {
 
         // grab data
         --buffer->len;
-        if(isPrime(buffer->buf[buffer->len])){
-            printf("Thread %ld: number <%d>, prime: YES\n", (long)pthread_self(), buffer->buf[buffer->len]);
-        }
-        else{
-            printf("Thread %ld: number <%d>, prime: NO\n", (long)pthread_self(), buffer->buf[buffer->len]);
-        }
-        
-
+        work = buffer->buf[buffer->len];
+        //printf("Thread %ld: WORK = %d\n", (long)pthread_self(), work);
         // signal the fact that new items may be produced
         pthread_cond_signal(&buffer->can_produce);
         pthread_mutex_unlock(&buffer->mutex);
+        if(isPrime(work)){
+            printf("Thread %ld: number <%d>, prime: YES\n", (long)pthread_self(), work);
+        }
+        else{
+            printf("Thread %ld: number <%d>, prime: NO\n", (long)pthread_self(), work);
+        }
+        sleep(rand() % 4);
     }
 
     // never reached
